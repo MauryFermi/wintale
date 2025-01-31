@@ -35,96 +35,101 @@
 
         <!-- Return Button -->
         <div class="text-center mt-4">
-            <button class="btn btn-outline-secondary btn-lg" onclick="returnToIndex()">
-                <i class="bi bi-arrow-left-circle"></i> Ritorna
-            </button>
+            <a href="/wintale/index.html" class="btn btn-outline-secondary btn-lg">
+                Ritorna
+            </a>
         </div>
     </div>
 
     <script>
-        // Aggiunge l'azione al pulsante "Ritorna"
-        function returnToIndex() {
-            window.location.href = 'index.html';
-        }
-
-        // Ottieni il parametro 'action' dall'URL
-        const params = new URLSearchParams(window.location.search);
-        const action = params.get('action');
-        const actionHeader = document.getElementById('action-header');
-        const pointsWrapper = document.getElementById('points-wrapper');
-
-        if (action === 'add') {
-            actionHeader.textContent = 'Aggiungi Punti';
-            pointsWrapper.style.display = 'block';
-        } else if (action === 'remove') {
-            actionHeader.textContent = 'Rimuovi Punti';
-            pointsWrapper.style.display = 'none';
-        }
-
-        // Configura lo scanner QR
-        const scanner = new Html5QrcodeScanner('reader', {
-            qrbox: { width: 250, height: 250 },
-            fps: 20,
-            supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
-        }, false);
-
-        // Usa esclusivamente la fotocamera posteriore
-        scanner.render(success, error, {
-            facingMode: "environment"
-        });
-
-        function success(result) {
-            let points = 0;
+        document.addEventListener('DOMContentLoaded', () => {
+    
+            const params = new URLSearchParams(window.location.search);
+            const action = params.get('action');
+            const actionHeader = document.getElementById('action-header');
+            const pointsWrapper = document.getElementById('points-wrapper');
+    
             if (action === 'add') {
-                const pointsInput = document.getElementById('points');
-                points = parseInt(pointsInput.value, 10) || 0;
-                if (isNaN(points)) {
-                    alert('Inserisci un numero valido di punti.');
-                    return;
+                actionHeader.textContent = 'Aggiungi Punti';
+                pointsWrapper.style.display = 'block';
+            } else if (action === 'remove') {
+                actionHeader.textContent = 'Rimuovi Punti';
+                pointsWrapper.style.display = 'none';
+            }
+    
+            // Configura lo scanner QR
+            const scanner = new Html5Qrcode("reader");
+    
+            // Usa esclusivamente la fotocamera posteriore
+            scanner.start(
+                { facingMode: "environment" },
+                {
+                    fps: 10,
+                    qrbox: { width: 250, height: 250 }
+                },
+                success,
+                error
+            );
+    
+            function success(result) {
+                let points = 0;
+                if (action === 'add') {
+                    const pointsInput = document.getElementById('points');
+                    points = parseInt(pointsInput.value, 10) || 0;
+                    if (isNaN(points)) {
+                        alert('Inserisci un numero valido di punti.');
+                        return;
+                    }
+                }
+    
+                // Separare il token e l'id_locale dalla stringa scansionata
+                const qrParts = result.split('-');
+                const token = qrParts[0];  // La parte prima del trattino è il token
+                const id_locale = qrParts[1];  // La parte dopo il trattino è l'id_locale
+    
+                sendDataToServer(token, points, id_locale);
+    
+                document.getElementById('result').innerHTML = `
+                    <div class="alert alert-success">
+                        <h2 class="fw-bold">Successo!</h2>
+                        <p><a href="${result}" target="_blank" class="link-success">${result}</a></p>
+                        ${action === 'add' ? `<p>Punti: ${points}</p>` : ''}
+                    </div>
+                `;
+                scanner.stop();
+                document.getElementById('reader').remove();
+            }
+    
+            function error(err) {
+                console.error(err);
+            }
+    
+            async function sendDataToServer(token, points, id_locale) {
+                const data = action === 'add' ? { token, points, id_locale } : { token, id_locale };
+                try {
+                    const url = action === 'add'
+                        ? 'https://nameless-bayou-76355-53bee8789917.herokuapp.com/updatePoints'
+                        : 'https://nameless-bayou-76355-53bee8789917.herokuapp.com/updateRPoints';
+    
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(data),
+                    });
+    
+                    if (response.ok) {
+                        console.log('Data sent successfully:', await response.json());
+                    } else {
+                        console.error('Failed to send data:', response.status, response.statusText);
+                    }
+                } catch (error) {
+                    console.error('Error while sending data:', error);
                 }
             }
-
-            sendDataToServer(result, points);
-
-            document.getElementById('result').innerHTML = `
-                <div class="alert alert-success">
-                    <h2 class="fw-bold">Successo!</h2>
-                    <p><a href="${result}" target="_blank" class="link-success">${result}</a></p>
-                    ${action === 'add' ? `<p>Punti: ${points}</p>` : ''}
-                </div>
-            `;
-            scanner.clear();
-            document.getElementById('reader').remove();
-        }
-
-        function error(err) {
-            console.error(err);
-        }
-
-        async function sendDataToServer(token, points) {
-            const data = action === 'add' ? { token, points } : { token };
-            try {
-                const url = action === 'add'
-                    ? 'https://nameless-bayou-76355-53bee8789917.herokuapp.com/updatePoints'
-                    : 'https://nameless-bayou-76355-53bee8789917.herokuapp.com/updateRPoints';
-
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(data),
-                });
-
-                if (response.ok) {
-                    console.log('Data sent successfully:', await response.json());
-                } else {
-                    console.error('Failed to send data:', response.status, response.statusText);
-                }
-            } catch (error) {
-                console.error('Error while sending data:', error);
-            }
-        }
+        });
     </script>
+    
 </body>
 </html>
